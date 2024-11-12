@@ -98,8 +98,8 @@ unset NO_PROXY
 ## Clash 订阅地址检测及配置文件下载
 # 检查url是否有效
 echo -e '\n正在检测订阅地址...'
-Text1="Clash订阅地址可访问！"
-Text2="Clash订阅地址不可访问！"
+Text1="Clash订阅地址可访问"
+Text2="Clash订阅地址不可访问"
 #curl -o /dev/null -s -m 10 --connect-timeout 10 -w %{http_code} $URL | grep '[23][0-9][0-9]' &>/dev/null
 curl -o /dev/null -L -k -sS --retry 5 -m 10 --connect-timeout 10 -w "%{http_code}" $URL | grep -E '^[23][0-9]{2}$' &>/dev/null
 ReturnStatus=$?
@@ -107,8 +107,8 @@ if_success $Text1 $Text2 $ReturnStatus
 
 # 拉取更新config.yml文件
 echo -e '\n正在下载Clash配置文件...'
-Text3="配置文件config.yaml下载成功！"
-Text4="配置文件config.yaml下载失败，退出启动！"
+Text3="配置文件下载成功"
+Text4="配置文件下载失败"
 
 # 尝试使用curl进行下载
 curl -L -k -sS --retry 5 -m 10 -o $Temp_Dir/clash.yaml $URL
@@ -117,7 +117,7 @@ if [ $ReturnStatus -ne 0 ]; then
 	# 如果使用curl下载失败，尝试使用wget进行下载
 	for i in {1..10}
 	do
-		wget -q --no-check-certificate -O $Temp_Dir/clash.yaml $URL
+		wget -q --no-check-certificate --show-progress -O $Temp_Dir/clash.yaml $URL
 		ReturnStatus=$?
 		if [ $ReturnStatus -eq 0 ]; then
 			break
@@ -134,12 +134,9 @@ if_success $Text3 $Text4 $ReturnStatus
 
 ## 判断订阅内容是否符合clash配置文件标准，尝试转换（当前不支持对 x86_64 以外的CPU架构服务器进行clash配置文件检测和转换，此功能将在后续添加）
 if [[ $CpuArch =~ "x86_64" || $CpuArch =~ "amd64" || $CpuArch =~ "arm64" ]]; then
-	echo -e '\n判断订阅内容是否符合clash配置文件标准:'
 	bash $Server_Dir/scripts/clash_profile_conversion.sh
 	sleep 3
 fi
-
-
 
 ## Clash 配置文件重新格式化及配置
 # 取出代理相关配置 
@@ -157,78 +154,23 @@ Dashboard_Dir="${Work_Dir}/dashboard/public"
 sed -ri "s@^# external-ui:.*@external-ui: ${Dashboard_Dir}@g" $Conf_Dir/config.yaml
 sed -r -i '/^secret: /s@(secret: ).*@\1'${Secret}'@g' $Conf_Dir/config.yaml
 
-
 ## 启动Clash服务
 echo -e '\n正在启动Clash服务...'
-Text5="服务启动成功！"
-Text6="服务启动失败！"
+Text5="服务启动成功"
+Text6="服务启动失败"
 if [[ $CpuArch =~ "x86_64" || $CpuArch =~ "amd64"  ]]; then
-	nohup $Server_Dir/bin/clash-linux-amd64 -d $Conf_Dir &> $Log_Dir/clash.log &
+	$Server_Dir/bin/clash-linux-amd64 -d $Conf_Dir
 	ReturnStatus=$?
 	if_success $Text5 $Text6 $ReturnStatus
 elif [[ $CpuArch =~ "aarch64" ||  $CpuArch =~ "arm64" ]]; then
-	nohup $Server_Dir/bin/clash-linux-arm64 -d $Conf_Dir &> $Log_Dir/clash.log &
+	$Server_Dir/bin/clash-linux-arm64 -d $Conf_Dir
 	ReturnStatus=$?
 	if_success $Text5 $Text6 $ReturnStatus
 elif [[ $CpuArch =~ "armv7" ]]; then
-	nohup $Server_Dir/bin/clash-linux-armv7 -d $Conf_Dir &> $Log_Dir/clash.log &
+	$Server_Dir/bin/clash-linux-armv7 -d $Conf_Dir
 	ReturnStatus=$?
 	if_success $Text5 $Text6 $ReturnStatus
 else
-	echo -e "\033[31m\n[ERROR] Unsupported CPU Architecture！\033[0m"
+	echo -e "\033[31m\n[ERROR] Unsupported CPU Architecture.\033[0m"
 	exit 1
 fi
-
-# Output Dashboard access address and Secret
-echo ''
-echo -e "Clash Dashboard 访问地址: http://<ip>:9090/ui"
-echo -e "Secret: ${Secret}"
-echo ''
-
-# 添加环境变量(root权限)
-cat>/etc/profile.d/clash.sh<<EOF
-# 开启系统代理
-proxy_on() {
-	export http_proxy=http://127.0.0.1:7890
-	export https_proxy=http://127.0.0.1:7890
-	export no_proxy=127.0.0.1,localhost
-    	export HTTP_PROXY=http://127.0.0.1:7890
-    	export HTTPS_PROXY=http://127.0.0.1:7890
- 	export NO_PROXY=127.0.0.1,localhost
-	echo -e "\033[32m[√] 已开启代理\033[0m"
-}
-
-# 关闭系统代理
-proxy_off(){
-	unset http_proxy
-	unset https_proxy
-	unset no_proxy
-  	unset HTTP_PROXY
-	unset HTTPS_PROXY
-	unset NO_PROXY
-	echo -e "\033[31m[×] 已关闭代理\033[0m"
-}
-EOF
-echo -e "     く__,.ヘヽ.        /  ,ー､ 〉"
-echo -e "           ＼ ', !-─‐-i  /  /´"
-echo -e "          ／｀ｰ'       L/／｀ヽ､"
-echo -e "         /   ／,   /|   ,   ,       ',"
-echo -e "        ｲ   / /-‐/  ｉ  L_ ﾊ ヽ!   i"
-echo -e "        ﾚ ﾍ 7ｲ｀ﾄ   ﾚ'ｧ-ﾄ､!ハ|   |"
-echo -e "          !,/7 '0'     ´0iソ|    |"
-echo -e "          |.从     _     ,,,, / |./    |"
-echo -e "          ﾚ'| i＞.､,,__  _,.イ /   .i   |"
-echo -e "           ﾚ'| | / k_７_/ﾚ'ヽ,  ﾊ.  |"
-echo -e "             | |/i 〈|/   i  ,.ﾍ |  i  |"
-echo -e "            .|/ /  ｉ：    ﾍ!    ＼  |"
-echo -e "             kヽ>､ﾊ    _,.ﾍ､    /､!"
-echo -e "             !'〈//｀Ｔ´', ＼ ｀'7'ｰr'"
-echo -e "             ﾚ'ヽL__|___i,___,ンﾚ|ノ"
-echo -e "                  ﾄ-,/  |___./"
-echo -e "                  'ｰ'    !_,.:"
-echo -e "本项目完全免费，若你是收费买的，恭喜您，您被骗了！"
-echo -e "项目地址：https://github.com/Elegycloud/clash-for-linux-backup"
-echo -e "项目随时会寄，且行且珍惜！"
-echo -e "请执行以下命令加载环境变量: source /etc/profile.d/clash.sh\n"
-echo -e "请执行以下命令开启系统代理: proxy_on\n"
-echo -e "若要临时关闭系统代理，请执行: proxy_off\n"
